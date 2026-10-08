@@ -455,15 +455,22 @@
          should also be non-empty.-->
     <string name="config_rawContactsLocalAccountType" translatable="false">com.android.contacts</string>
 
-    <!-- If AOD can show an ambient version of the wallpaper -->
-    <bool name="config_dozeSupportsAodWallpaper">true</bool>
+    <!-- Name of the font family to use in the default lockscreen clock -->
+    <string name="config_clockFontFamily" translatable="false" />
 
-    <!-- The amount to scale fullscreen snapshots for Overview and snapshot starting windows. -->
-    <item name="config_highResTaskSnapshotScale" format="float" type="dimen">0.6</item>
+    <!-- Whether to enable glanceable hub features on this device. -->
+    <bool name="config_glanceableHubEnabled">true</bool>
 
-    <bool name="config_enableNewAutoSelectNetworkUI">true</bool>
+    <!-- Whether glanceable hub is enabled by default. -->
+    <bool name="config_glanceableHubEnabledByDefault">true</bool>
 
-    <bool name="config_enableBurnInProtection">true</bool>
-
-    <item name="config_wallpaperMaxScale" format="float" type="dimen">1.30</item>
+    <!-- The default list of possible CMF Names|Style|ColorSource. This array can be
+         overridden device-specific resources. A wildcard (fallback) must be supplied.
+         Name   - Read from `ro.boot.hardware.color` sysprop. Fallback (*) required.
+         Styles - frameworks/libs/systemui/monet/src/com/android/systemui/monet/Style.java
+         Color  - `home_wallpaper` (for color extraction) or a comma-separated list of
+                  hexadecimal int (#FFcc99,#aabbcc). -->
+    <string-array name="theming_defaults" translatable="false">
+        <item>*|TONAL_SPOT|#63a3ad</item>
+    </string-array>
 </resources>

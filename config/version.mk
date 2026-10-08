@@ -1,4 +1,4 @@
-PRODUCT_VERSION_MAJOR = 16
+PRODUCT_VERSION_MAJOR = 24
 PRODUCT_VERSION_MINOR = 0
 
 # Increase Lunaris Version with each major release.

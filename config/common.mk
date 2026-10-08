@@ -14,6 +14,10 @@ endif
 PRODUCT_SOURCE_ROOT_DIRS += -kernel/platform
 PRODUCT_SOURCE_ROOT_DIRS += -prebuilts/misc/protobuf_vendorcompat
 
+# Exclude repos from bp scanning
+PRODUCT_SOURCE_ROOT_DIRS += -kernel/platform
+PRODUCT_SOURCE_ROOT_DIRS += -prebuilts/misc/protobuf_vendorcompat
+
 # Allow vendor prebuilt repos to exclude themselves from bp scanning
 -include $(sort $(wildcard vendor/*/*/exclude-bp.mk))
 
@@ -60,6 +64,9 @@ endif
 PRODUCT_COPY_FILES += \
     vendor/lineage/prebuilt/common/bin/backuptool.sh:install/bin/backuptool.sh \
     vendor/lineage/prebuilt/common/bin/backuptool.functions:install/bin/backuptool.functions
+
+PRODUCT_PACKAGES += \
+    50-lineage.sh
 
 #ifeq ($(LINEAGE_BUILD),true)
 #PRODUCT_COPY_FILES += \
@@ -191,6 +198,12 @@ PRODUCT_ARTIFACT_PATH_REQUIREMENT_ALLOWED_LIST += \
     system/bin/getcap \
     system/bin/setcap \
     system/%/libzstd.so
+
+# fastbootd
+ifneq ($(TARGET_DISABLE_FASTBOOTD),true)
+PRODUCT_PACKAGES += \
+    fastbootd
+endif
 
 # Filesystems tools
 PRODUCT_PACKAGES += \

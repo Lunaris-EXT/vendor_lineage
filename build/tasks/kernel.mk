@@ -29,8 +29,6 @@
 #                                          Same as TARGET_KERNEL_CONFIG, but paths are specified
 #                                          instead of filenames.
 #
-#   TARGET_KERNEL_CLANG_COMPILE        = Compile kernel with clang, defaults to true
-#
 #   BOARD_KERNEL_IMAGE_NAME            = Built image name
 #                                          for ARM use: zImage
 #                                          for ARM64 use: Image.gz
@@ -254,25 +252,17 @@ endif
 ifeq ($(FULL_KERNEL_BUILD),true)
 # Add host bin out dir to path
 PATH_OVERRIDE := PATH=$(KERNEL_BUILD_OUT_PREFIX)$(HOST_OUT_EXECUTABLES):$$PATH
-ifneq ($(TARGET_KERNEL_CLANG_COMPILE),false)
-    ifneq ($(KERNEL_NO_GCC), true)
-        ifeq ($(KERNEL_ARCH),arm64)
-            KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=aarch64-linux-gnu-
-        else ifeq ($(KERNEL_ARCH),arm)
-            KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=arm-linux-gnu-
-        else ifeq ($(KERNEL_ARCH),x86)
-            KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=x86_64-linux-gnu-
-        endif
-        PATH_OVERRIDE += LD_LIBRARY_PATH=$(TARGET_KERNEL_CLANG_PATH)/lib64:$$LD_LIBRARY_PATH
-    endif
-    PATH_OVERRIDE += PATH=$(TARGET_KERNEL_CLANG_PATH)/bin:$$PATH
-    ifeq ($(KERNEL_CC),)
-        KERNEL_CC := CC="$(KERNEL_CC_WRAPPER) clang" LD=ld.lld
-    endif
+ifeq ($(KERNEL_ARCH),arm64)
+    KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=aarch64-linux-gnu-
+else ifeq ($(KERNEL_ARCH),arm)
+    KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=arm-linux-gnu-
+else ifeq ($(KERNEL_ARCH),x86)
+    KERNEL_CLANG_TRIPLE ?= CLANG_TRIPLE=x86_64-linux-gnu-
 endif
-
-ifneq ($(KERNEL_NO_GCC), true)
-    PATH_OVERRIDE += PATH=$(KERNEL_TOOLCHAIN_PATH_gcc):$$PATH
+PATH_OVERRIDE += LD_LIBRARY_PATH=$(TARGET_KERNEL_CLANG_PATH)/lib64:$$LD_LIBRARY_PATH
+PATH_OVERRIDE += PATH=$(TARGET_KERNEL_CLANG_PATH)/bin:$$PATH
+ifeq ($(KERNEL_CC),)
+    KERNEL_CC := CC="$(KERNEL_CC_WRAPPER) clang" LD=ld.lld
 endif
 
 # System tools are no longer allowed on 10+
@@ -310,7 +300,7 @@ endef
 # Make an external module target using kbuild
 # $(1): module name
 # $(2): module root path relative to kernel source
-# $(2): target to build (eg. modules_install)
+# $(3): target to build (eg. modules_install)
 define make-kbuild-module-target
 $(PATH_OVERRIDE) $(KERNEL_MAKE_CMD) $(KERNEL_MAKE_FLAGS) -C $(BUILD_TOP)/$(KERNEL_SRC) M=$(2)/$(1) O=$(KERNEL_BUILD_OUT_PREFIX)$(KERNEL_OUT) ARCH=$(KERNEL_ARCH) $(KERNEL_CROSS_COMPILE) $(KERNEL_CLANG_TRIPLE) $(KERNEL_CC) $(3)
 endef
@@ -322,11 +312,11 @@ define make-kernel-config
 	cp $(word 1,$(2)) $(1)/.config; \
 	$(call internal-make-kernel-target,$(1),olddefconfig); \
 	$(if $(filter true,$(MERGE_ALL_KERNEL_CONFIGS_AT_ONCE)),\
-		$(KERNEL_SRC)/scripts/kconfig/merge_config.sh -m -O $(1) $(1)/.config $(filter %.config,$(2)); \
+		( cd $(abspath $(1)) && $(abspath $(KERNEL_SRC))/scripts/kconfig/merge_config.sh -m -O $(abspath $(1)) $(abspath $(1))/.config $(abspath $(filter %.config,$(2))) ); \
 		$(call internal-make-kernel-target,$(1),olddefconfig); \
 	, \
 		$(foreach config,$(filter %.config,$(2)), \
-			$(KERNEL_SRC)/scripts/kconfig/merge_config.sh -m -O $(1) $(1)/.config $(config); \
+			( cd $(abspath $(1)) && $(abspath $(KERNEL_SRC))/scripts/kconfig/merge_config.sh -m -O $(abspath $(1)) $(abspath $(1))/.config $(abspath $(config)) ); \
 			$(call internal-make-kernel-target,$(1),olddefconfig); \
 		) \
 	)
@@ -603,7 +593,9 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_CONFIG) $(DEPMOD) $(DTC) $(KERNEL_MODULE
 					if [ -n "$$p" ]; then echo $$p; else echo "ERROR: $$m from BOOT_KERNEL_MODULES was not found" 1>&2 && exit 1; fi; \
 				done); \
 				[ $$? -ne 0 ] && exit 1; \
-				($(call build-image-kernel-modules-lineage,$$vendor_boot_modules,$(KERNEL_VENDOR_RAMDISK_MODULES_OUT),,$(KERNEL_VENDOR_RAMDISK_DEPMOD_STAGING_DIR),$(KERNEL_VENDOR_RAMDISK_KERNEL_MODULES_LOAD),,,)) || exit "$$?"; \
+				if [ -n "$$vendor_boot_modules" ]; then \
+					($(call build-image-kernel-modules-lineage,$$vendor_boot_modules,$(KERNEL_VENDOR_RAMDISK_MODULES_OUT),,$(KERNEL_VENDOR_RAMDISK_DEPMOD_STAGING_DIR),$(KERNEL_VENDOR_RAMDISK_KERNEL_MODULES_LOAD),,,)) || exit "$$?"; \
+				fi; \
 			) \
 			$(if $(RECOVERY_KERNEL_MODULES)$(RECOVERY_KERNEL_MODULES_FINDER),\
 				$(if $(RECOVERY_KERNEL_MODULES_FINDER), \
@@ -617,7 +609,9 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_CONFIG) $(DEPMOD) $(DTC) $(KERNEL_MODULE
 					if [ -n "$$p" ]; then echo $$p; else echo "ERROR: $$m from RECOVERY_KERNEL_MODULES was not found" 1>&2 && exit 1; fi; \
 				done); \
 				[ $$? -ne 0 ] && exit 1; \
-				($(call build-image-kernel-modules-lineage,$$recovery_modules,$(KERNEL_RECOVERY_MODULES_OUT),,$(KERNEL_RECOVERY_DEPMOD_STAGING_DIR),$(BOARD_RECOVERY_KERNEL_MODULES_LOAD),,,)) || exit "$$?"; \
+				if [ -n "$$recovery_modules" ]; then \
+					($(call build-image-kernel-modules-lineage,$$recovery_modules,$(KERNEL_RECOVERY_MODULES_OUT),,$(KERNEL_RECOVERY_DEPMOD_STAGING_DIR),$(BOARD_RECOVERY_KERNEL_MODULES_LOAD),,,)) || exit "$$?"; \
+				fi; \
 			) \
 		fi
 
@@ -767,15 +761,8 @@ $(TARGET_PREBUILT_INT_KERNEL): $(DEPMOD) $(KERNEL_MODULES_PARTITION_FILE_LIST) $
 	@echo "Building $(BOARD_KERNEL_IMAGE_NAME)"
 	$(hide) rm -rf $(KERNEL_OUT)
 	@mkdir -p $(KERNEL_OUT) $(KERNEL_BAZEL_OUT)
-	$(hide) cd $(KERNEL_PATH) && \
-		python3 $(BUILD_TOP)/.repo/repo/repo manifest -o - -r \
-		| awk -v pat="kernel/platform/kernel-$(TARGET_KERNEL_VERSION)" ' \
-			/^  <project.*\/>$$/    { if (index($$0, pat)) { gsub(pat "/", ""); print }; next } \
-			/^  <project/          { keep = index($$0, pat) > 0; if (keep) { gsub(pat "/", ""); print }; buf = 1; next } \
-			buf && /  <\/project>/ { if (keep) { gsub(pat "/", ""); print }; buf = 0; next } \
-			buf                    { if (keep) { gsub(pat "/", ""); print }; next } \
-			                       { print } \
-		' \
+	$(hide) cd $(BUILD_TOP) && \
+		python3 vendor/lineage/build/tools/kernel_kleaf_manifest.py $(TARGET_KERNEL_VERSION) \
 		> $(abspath $(KERNEL_OUT))/manifest.xml
 	$(hide) cd $(KERNEL_PATH) && \
 		./tools/bazel \
@@ -786,6 +773,7 @@ $(TARGET_PREBUILT_INT_KERNEL): $(DEPMOD) $(KERNEL_MODULES_PARTITION_FILE_LIST) $
 			--cpu=$(KERNEL_ARCH) \
 			--repo_manifest $(KERNEL_REPO_MANIFEST) \
 			--config=stamp \
+			$(KERNEL_BAZEL_FLAGS) \
 			//$(KERNEL_SRC):$(TARGET_KERNEL_PLATFORM_TARGET)_dist \
 			-- --destdir=$(abspath $(KERNEL_OUT))
 	$(if $(BOOT_KERNEL_MODULES),\
@@ -796,7 +784,7 @@ $(TARGET_PREBUILT_INT_KERNEL): $(DEPMOD) $(KERNEL_MODULES_PARTITION_FILE_LIST) $
 	)
 	$(if $(filter $(TARGET_KERNEL_MIXED_MODE),true),\
 		system_dlkm_modules=$$(awk -F'/' '{ print "$(KERNEL_OUT)/"$$NF }' $(KERNEL_OUT)/system_dlkm.modules.load); \
-		($(call build-image-kernel-modules-lineage,$$system_dlkm_modules,$(SYSTEM_KERNEL_MODULES_OUT),$(SYSTEM_KERNEL_MODULE_MOUNTPOINT)/,$(SYSTEM_KERNEL_DEPMOD_STAGING_DIR),,,$(SYSTEM_KERNEL_MODULES_PARTITION_FILE_LIST),))\
+		($(call build-image-kernel-modules-lineage,$$system_dlkm_modules,$(SYSTEM_KERNEL_MODULES_OUT),$(SYSTEM_KERNEL_MODULE_MOUNTPOINT)/,$(SYSTEM_KERNEL_DEPMOD_STAGING_DIR),$$system_dlkm_modules,,$(SYSTEM_KERNEL_MODULES_PARTITION_FILE_LIST),))\
 	)
 	vendor_modules=$$(comm -23 <(find $(KERNEL_OUT) -maxdepth 1 -type f -name '*.ko' | awk -F'/' '{ print $$NF }' | sort) <(awk -F'/' '{ print $$NF }' $(KERNEL_OUT)/system_dlkm.modules.load | sort) | sed 's|^|$(KERNEL_OUT)/|'); \
 	($(call build-image-kernel-modules-lineage,$$vendor_modules,$(KERNEL_MODULES_OUT),$(KERNEL_MODULE_MOUNTPOINT)/,$(KERNEL_DEPMOD_STAGING_DIR),$(BOARD_VENDOR_KERNEL_MODULES_LOAD),,$(KERNEL_MODULES_PARTITION_FILE_LIST),$(SYSTEM_KERNEL_DEPMOD_STAGING_DIR)/lib/modules/0.0/$(SYSTEM_KERNEL_MODULE_MOUNTPOINT)))

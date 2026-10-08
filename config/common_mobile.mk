@@ -18,6 +18,8 @@ endif
 # Apps
 PRODUCT_PACKAGES += \
     AvatarPicker \
+    Backgrounds \
+    Canvas \
     Glimpse \
     LatinIME
 
@@ -37,6 +39,10 @@ endif
 
 PRODUCT_PACKAGES += \
     Launcher3Overlay
+
+# Credential storage
+PRODUCT_PACKAGES += \
+    android.software.credentials.prebuilt.xml
 
 # Credential storage
 PRODUCT_PACKAGES += \
